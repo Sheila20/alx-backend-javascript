@@ -1,50 +1,60 @@
 const fs = require('fs');
 
-async function countStudents(filepath) {
-  try {
-    const csv = await fs.promises.readFile(filepath, { encoding: 'utf8' });
-    const headerArray = csv.split(/\r?\n|\n/);
-    const headers = headerArray[0].split(',');
+function countStudents(path) {
+  const promise = new Promise((resolve, reject) => {
+    fs.readFile(path, 'utf-8', (error, results) => {
+      if (error) {
+        reject(Error('Cannot load the database'));
+      } else {
+        const lines = results.split('\n');
+        let i = 0;
+        let countStudents = 0;
+        let msg = '';
+        const fields = {};
 
-    // strip headers and convert to list of dicts
-    const dictList = [];
-    const noHeaderArray = headerArray.slice(1);
-    for (let i = 0; i < noHeaderArray.length; i += 1) {
-      const data = noHeaderArray[i].split(',');
-      if (data.length === headers.length) {
-        const row = {};
-        for (let j = 0; j < headers.length; j += 1) {
-          row[headers[j].trim()] = data[j].trim();
-        }
-        dictList.push(row);
-      }
-    }
+        const getLines = () => {
+          for (const line of lines) {
+            if (line.trim() !== '' && i > 0) {
+              countStudents += 1;
+              const [fname, lname, age, field] = line.split(','); // eslint-disable-line
+              if (!fields[field]) {
+                fields[field] = {
+                  count: 1,
+                  students: [fname],
+                };
+              } else {
+                const newCount = fields[field].count + 1;
+                const newStudents = fields[field].students.concat(fname);
+                fields[field] = {
+                  count: newCount,
+                  students: newStudents,
+                };
+              }
+            }
+            i += 1;
+          }
+        };
 
-    // count and collect first names of students per field
-    let countCS = 0;
-    let countSWE = 0;
-    const studentsCS = [];
-    const studentsSWE = [];
+        const display = async () => {
+          getLines();
+          console.log(`Number of students: ${countStudents}`);
+          msg += `Number of students: ${countStudents}\n`;
+          for (const field of Object.keys(fields)) {
+            const n = fields[field].count;
+            const names = fields[field].students.join(', ');
+            console.log(`Number of students in ${field}: ${n}. List: ${names}`);
+            msg += `Number of students in ${field}: ${n}. List: ${names}\n`;
+          }
+          msg = msg.slice(0, -1);
+        };
 
-    dictList.forEach((element) => {
-      if (element.field === 'CS') {
-        countCS += 1;
-        studentsCS.push(element.firstname);
-      } else if (element.field === 'SWE') {
-        countSWE += 1;
-        studentsSWE.push(element.firstname);
+        display();
+        resolve(msg);
       }
     });
+  });
 
-    const countStudents = countCS + countSWE;
-
-    // print statements
-    console.log(`Number of students: ${countStudents}`);
-    console.log(`Number of students in CS: ${countCS}. List: ${studentsCS.toString().split(',').join(', ')}`);
-    console.log(`Number of students in SWE: ${countSWE}. List: ${studentsSWE.toString().split(',').join(', ')}`);
-  } catch (err) {
-    throw new Error('Cannot load the database');
-  }
+  return promise;
 }
 
 module.exports = countStudents;
